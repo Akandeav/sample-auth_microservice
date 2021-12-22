@@ -19,7 +19,7 @@ from.models import UserData
 #from .producer import publishUser
 import jwt, datetime
 
-secret = 'y>B+vd\7RkdrU~z`/r=6[LA3HR'
+secret = 'fghjkl;lklmnkbv'
 
 '''
 User Signup API

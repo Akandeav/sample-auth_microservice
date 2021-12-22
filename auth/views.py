@@ -37,24 +37,27 @@ class SignupView(APIView):
         serializer = UserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        token = GenerateVerLink.post(self, request)
+        token = GenerateToken.post(self, request)
         response = Response()
         message = "http://localhost:3000/auth/verify/" + str(token.data['token'])
         print(message)
         response.data = {
+            "ok": True,
             'message': message
         }
         
         #publishUser('user_created', serializer.data)
         return response
-class ChangePasswordLink(APIView):
+class ForgotPasswordLink(APIView):
     def post(self, request):
         email = request.data['email']
-        token = GenerateVerLink.post(self, request)
+        token = GenerateToken.post(self, request)
+        print(email)
         response = Response()
         message = "http://localhost:3000/auth/forgotpwd/" + str(token.data['token'])
         print(message)
         response.data = {
+            "ok": True,
             'message': message
         }
         return response
@@ -66,14 +69,11 @@ data: {
     email: ""
 } 
 '''  
-class GenerateVerLink(APIView):
+class GenerateToken(APIView):
     def post(self, request):
         email = request.data['email']
-        iat = datetime.datetime.utcnow()
-        date = iat.date()
-        time = iat.time()
         payload = {
-                'email': request.data['email'],
+                'email': email,
                 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30),
                 'iat': datetime.datetime.utcnow()
             }
@@ -81,16 +81,44 @@ class GenerateVerLink(APIView):
         token = jwt.encode(payload, secret, algorithm='HS256')
         response = Response()
         response.data = {
+            "ok": True,
             'token': token
         }
         
         #publishUser('VerLink_created', serializer.data)
         return response
 
-class VerifyToken(APIView):
+class GenerateEmailLink(APIView):
     def post(self, request):
-        token = request.data['B']
+        email = request.data['email']
+        print(email)
+        message=''
+        if (UserData.objects.filter(email=email, user_verification=1)):
+            ok = False
+        else:
+            payload = {
+                    'email': email,
+                    'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30),
+                    'iat': datetime.datetime.utcnow()
+                }
+            
+            token = jwt.encode(payload, secret, algorithm='HS256')
+            message = "http://localhost:3000/auth/verify/" + str(token)
+            print(message)
+            ok = True
         
+        response = Response()
+        response.data = {
+            "ok": ok,
+            'message': message
+        }
+        
+        
+        
+        
+        #publishUser('VerLink_created', serializer.data)
+        return response
+
 
 # User Verification /auth/verify
 
@@ -102,19 +130,19 @@ class VerifyEmail(APIView):
         try:
             payload = jwt.decode(token, secret, algorithms=['HS256'])
         except jwt.ExpiredSignatureError:
-            message = "Expired link"
+            message = False
             raise AuthenticationFailed('Link Expired')
         user = UserData.objects.get(email=payload['email'])
         if UserData.objects.filter(email=payload['email'], user_verification=0).first():
             user.user_verification = True
             user.save()
-            message = "Success Email is Verified"
+            message = True
         elif UserData.objects.filter(email=payload['email'], user_verification=1).first():
-            message = "Email already verified"
+            message = False
         response = Response()
         response.data = {
             'user': payload['email'],
-            'message': message
+            'ok': message
             
         }
         return response
@@ -149,6 +177,7 @@ class LoginView(APIView):
             response = Response()
             response.set_cookie(key='plt', value=token, httponly=True)
             response.data = {
+                "ok": True,
                 "token": token
             }
         return response
@@ -160,7 +189,7 @@ class LogoutView(APIView):
         response = Response()
         response.delete_cookie('plt')
         response.data = {
-            'message': 'Logged out!'
+            'ok': True
         }
         return response
 
@@ -171,7 +200,7 @@ class UserView(APIView):
         token  = request.COOKIES.get('plt')
 
         if not token:
-            message = "no"
+            message = False
             raise AuthenticationFailed('Unauthenticated')
         try:
             payload = jwt.decode(token, secret, algorithms=['HS256'])
@@ -179,39 +208,66 @@ class UserView(APIView):
             raise AuthenticationFailed('Unathenticated')
         user = UserData.objects.filter(id=payload['id']).first()
         serializer = UserSerializer(user)
-        message = "yes"
+        message = True
         response = Response()
         response.data = {
             "data": serializer.data,
-            "message": message
+            "ok": message
         }
         return response
 
 # active user change password /auth/changepwd
-
-class ChangePassword(APIView):
+class ForgotPassword(APIView):
     def post(self, request):
         password = request.data['password']
-        token  = request.COOKIES.get('jwt')
-
+        token  = request.data['id']
         if not token:
+            message = False
             raise AuthenticationFailed('Unauthenticated')
         try:
             payload = jwt.decode(token, secret, algorithms=['HS256'])
         except jwt.ExpiredSignatureError:
+            message = False
+            raise AuthenticationFailed('session expired')
+        
+        user = UserData.objects.filter(email=payload['email']).first()
+        user.set_password(request.data['password'])
+        user.save()
+        message = True
+        response = Response()
+        
+        response.data= {
+            "ok": message
+        } 
+        return response
+
+class ChangePassword(APIView):
+    def post(self, request):
+        password = request.data['password']
+        token  = request.COOKIES.get('plt')
+
+        if not token:
+            message = False
+            raise AuthenticationFailed('Unauthenticated')
+        try:
+            payload = jwt.decode(token, secret, algorithms=['HS256'])
+        except jwt.ExpiredSignatureError:
+            message = False
             raise AuthenticationFailed('session expired')
         
         user = UserData.objects.filter(id=payload['id']).first()
         
         if not user.check_password(password):
+            message = False
             raise AuthenticationFailed('Incorrect password')
         
         user.set_password(request.data['new_password'])
         user.save()
+        message = True
         response = Response()
         response.delete_cookie('jwt')
         response.data= {
-            'id': "Login again!"
+            'ok': message
         } 
         return response 
 
@@ -254,9 +310,18 @@ class QueryEmail(APIView):
                 'message': 'yes'
             }
         else:
-            response.data = {
-                'message': 'no'
-            }
+            if (UserData.objects.filter(email=email, user_verification=0)):
+                uv = False
+                response.data = {
+                    'message': 'no',
+                    "verified": uv
+                }
+            else:
+                uv = True
+                response.data = {
+                    'message': 'no',
+                    "verified": uv
+                }
 
         return response
     

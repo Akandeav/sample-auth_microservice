@@ -6,3 +6,5 @@ django-cors-headers==3.5.0
 pika==1.1.0
 PyJWT
 requests
+django-extensions
+pydotplus

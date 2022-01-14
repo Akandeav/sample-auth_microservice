@@ -19,20 +19,22 @@ from.models import UserData
 #from .producer import publishUser
 import jwt, datetime
 
-secret = 'fghjkl;lklmnkbv'
+secret = ' '
 
-'''
-User Signup API
-/auth/signup
-method: POST
-data: {
-    firstname: "",
-    lastname: "",
-    email: "",
-    password: "",
-} 
-'''      
+      
 class SignupView(APIView):
+    '''
+    User Signup API
+    /auth/signup
+    method: POST
+    data: {
+        firstname: "",
+        lastname: "",
+        email: "",
+        password: "",
+    } 
+    Returns signup status
+    '''
     def post(self, request):
         serializer = UserSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -40,7 +42,7 @@ class SignupView(APIView):
         token = GenerateToken.post(self, request)
         response = Response()
         message = "http://localhost:3000/auth/verify/" + str(token.data['token'])
-        print(message)
+        print(message) #For test purpose only, ideally request is sent to Notification service
         response.data = {
             "ok": True,
             'message': message
@@ -48,28 +50,33 @@ class SignupView(APIView):
         
         #publishUser('user_created', serializer.data)
         return response
+
 class ForgotPasswordLink(APIView):
+    """
+    Generate a forgot password link
+    /auth/forgot.password.link
+
+    Returns a password reset link
+    """
     def post(self, request):
         email = request.data['email']
         token = GenerateToken.post(self, request)
         print(email)
         response = Response()
         message = "http://localhost:3000/auth/forgotpwd/" + str(token.data['token'])
-        print(message)
+        print(message) # For test purposes only. Ideal situation link is sent to Notification service
         response.data = {
             "ok": True,
             'message': message
         }
         return response
-'''
-Generate email verification link API
-/auth/gnt
-method: POST
-data: {
-    email: ""
-} 
-'''  
+ 
 class GenerateToken(APIView):
+    """
+    Generates web token, for internal calls only
+
+    Returns a web token
+    """
     def post(self, request):
         email = request.data['email']
         payload = {
@@ -89,11 +96,22 @@ class GenerateToken(APIView):
         return response
 
 class GenerateEmailLink(APIView):
+    '''
+    Generate email verification link API
+    /auth/generate.email.link
+    method: POST
+    data: {
+        email: ""
+    }
+    
+    Returns status: True or False
+    ''' 
     def post(self, request):
         email = request.data['email']
         print(email)
         message=''
-        if (UserData.objects.filter(email=email, user_verification=1)):
+        
+        if (UserData.objects.filter(email=email, user_verification=1)): #User is already verified
             ok = False
         else:
             payload = {
@@ -103,7 +121,7 @@ class GenerateEmailLink(APIView):
                 }
             
             token = jwt.encode(payload, secret, algorithm='HS256')
-            message = "http://localhost:3000/auth/verify/" + str(token)
+            message = "http://localhost:3000/auth/verify/" + str(token) # For test purposes only. Ideal situation link is sent to Notification service
             print(message)
             ok = True
         
@@ -119,10 +137,13 @@ class GenerateEmailLink(APIView):
         #publishUser('VerLink_created', serializer.data)
         return response
 
-
-# User Verification /auth/verify
-
 class VerifyEmail(APIView):
+    """
+    Verifies a user's email
+    /auth/verify.email
+    
+    Returns status
+    """
     def post(self, request):
         token  = request.data['B']
         if not token:
@@ -147,9 +168,13 @@ class VerifyEmail(APIView):
         }
         return response
 
-# Login /auth/signin
-
 class LoginView(APIView):
+    """
+    User Login
+    /auth/signin
+
+    Returns status and web token
+    """
     def post(self, request):
         email = request.data['email']
         password = request.data['password']
@@ -182,9 +207,13 @@ class LoginView(APIView):
             }
         return response
 
-# Logout /auth/logout
-
 class LogoutView(APIView):
+    """
+    Delete user token
+    /auth/logout
+
+    Returns True
+    """
     def post(self, request):
         response = Response()
         response.delete_cookie('plt')
@@ -193,9 +222,13 @@ class LogoutView(APIView):
         }
         return response
 
-# Get active user info /auth/user
-
 class UserView(APIView):
+    """
+    Gets logged in user information
+    /auth/user
+
+    Returns JSON with user data
+    """
     def get(self, request):
         token  = request.COOKIES.get('plt')
 
@@ -216,8 +249,14 @@ class UserView(APIView):
         }
         return response
 
-# active user change password /auth/changepwd
 class ForgotPassword(APIView):
+    """
+    Change user password.
+    Requires token
+    /auth/forgot.password
+
+    Returns status
+    """
     def post(self, request):
         password = request.data['password']
         token  = request.data['id']
@@ -242,6 +281,13 @@ class ForgotPassword(APIView):
         return response
 
 class ChangePassword(APIView):
+    """
+    Allows user to change password
+    requires user token
+    /auth/change.password
+
+    Returns status
+    """
     def post(self, request):
         password = request.data['password']
         token  = request.COOKIES.get('plt')
@@ -271,9 +317,14 @@ class ChangePassword(APIView):
         } 
         return response 
 
-# Delete user 
-
 class DeleteUserView(APIView):
+    """
+    Delete a user from database
+    requires admin role
+    /auth/delete
+
+    Returns status
+    """
     def delete(self, request):
         token  = request.COOKIES.get('jwt')
         email = request.data['email']
@@ -298,9 +349,13 @@ class DeleteUserView(APIView):
             raise AuthenticationFailed('Unauthorized access!')
         return response
 
-# Registered email query
-
 class QueryEmail(APIView):
+    """
+    Queries database if an email is already registered or verified
+    /auth/verify.email
+
+    Returns status
+    """
     def post(self, request):
         email = request.data['email']
         user = UserData.objects.filter(email=email)
@@ -322,6 +377,5 @@ class QueryEmail(APIView):
                     'message': 'no',
                     "verified": uv
                 }
-
         return response
     

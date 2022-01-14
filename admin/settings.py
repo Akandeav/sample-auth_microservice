@@ -83,9 +83,9 @@ WSGI_APPLICATION = 'admin.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'phis-auth',
+        'NAME': 'auth',
         'USER': 'root',
-        'PASSWORD': 'victor.Fedgen',
+        'PASSWORD': 'root',
         'HOST': 'db',
         'PORT': '3306',
     }

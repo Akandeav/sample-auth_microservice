@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.urls import path
-from .views import SignupView, LoginView, UserView, LogoutView, DeleteUserView, VerifyEmail, GenerateToken, ChangePassword, QueryEmail, ForgotPasswordLink, ForgotPassword, GenerateEmailLink
-
+from .views import *
 urlpatterns = [
     path('signup', SignupView.as_view()),
     path('signin', LoginView.as_view()),
